@@ -1,0 +1,56 @@
+#function for generating a dataframe from a csv file of the melt_curves table from BioRad Manager 3.1
+def create_melt_df(path):
+  rfu_df = ''
+  files = os.listdir(path)
+  for x in files:
+    if 'derivative' in x.lower():
+      rfu_df = pd.read_csv(os.path.join(path, x), sep = ';').T
+      rfu_df.columns = rfu_df.loc['Temperature']
+      if 'Unnamed: 0' in rfu_df.index:
+        rfu_df.drop(['Unnamed: 0', 'Temperature'], axis = 'index', inplace=True)
+
+      break
+    else:
+      rfu_df = "There is no dRFU/dT data file"
+
+  return rfu_df
+
+
+#function for adding labels to each sample from files .xslx
+def create_labeled_data(rfu_data_frame, path): 
+  files_list = os.listdir(path)
+  rfu_data_frame = rfu_data_frame.copy()
+
+  if 'Success' not in rfu_data_frame.columns:
+    rfu_data_frame['Success'] = ''
+
+  xlsx_files_names = [x for x in files_list if '.xlsx' in x]
+  for excel_file in xlsx_files_names:
+    excel_path = os.path.join(path, excel_file)
+    
+    try:
+      
+      excel_df = pd.read_excel(excel_path, header=1)
+      required_columns = ['Лунка RT/WGA', 'Success']
+      
+      if not all(col in excel_df.columns for col in required_columns):
+        print(f"Warning: the necessary columns are missing in the {excel_file} file")
+        
+        continue
+        
+      info = excel_df[required_columns]
+
+      for idx, row in info.iterrows():
+        well_id = row['Лунка RT/WGA']
+        succes_value = row['Success']
+
+        if well_id in rfu_data_frame.index:
+          rfu_data_frame.loc[well_id, 'Success'] = succes_value
+        elif well_id not in rfu_data_frame.index:
+          print('Warning: there is no such well')
+
+    except Exception as e:
+      print(f"Error reading the {excel_file} file: {e}")
+      continue
+    
+  return rfu_data_frame
